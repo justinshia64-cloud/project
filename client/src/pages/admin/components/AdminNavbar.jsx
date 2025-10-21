@@ -12,6 +12,7 @@ import {
 import { LogOut, Settings } from "lucide-react"
 import axiosClient from "@/axiosClient"
 import { toast } from "react-toastify"
+import NotificationsDropdown from "@/components/NotificationsDropdown"
 
 export default function AdminNavbar() {
   const navigate = useNavigate()
@@ -43,49 +44,54 @@ export default function AdminNavbar() {
             </div>
           </Link>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <div className="flex items-center gap-2 px-2 py-1 hover:bg-slate-100 cursor-pointer rounded-md transition">
-              <Avatar>
-                <AvatarFallback className="bg-blue-700 font-semibold flex items-center justify-center ring-2 ring-white/40">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                </AvatarFallback>
-              </Avatar>
-              <span className="capitalize max-[768px]:hidden text-sm text-slate-800">
-                {name.split(" ").slice(0, 1)}
-              </span>
-            </div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem
-              className="flex items-center gap-1 cursor-pointer"
-              asChild
-            >
-              <Link
-                to="/admin/settings"
+        <div className="flex items-center gap-3">
+          {/* Admin notifications - poll every 5s for near-real-time updates */}
+          <NotificationsDropdown iconClass="text-slate-700" pollInterval={5000} />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div className="flex items-center gap-2 px-2 py-1 hover:bg-slate-100 cursor-pointer rounded-md transition">
+                <Avatar>
+                  <AvatarFallback className="bg-blue-700 font-semibold flex items-center justify-center ring-2 ring-white/40">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                  </AvatarFallback>
+                </Avatar>
+                <span className="capitalize max-[768px]:hidden text-sm text-slate-800">
+                  {name.split(" ").slice(0, 1)}
+                </span>
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem
                 className="flex items-center gap-1 cursor-pointer"
+                asChild
               >
-                <Settings /> Settings
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="flex items-center gap-1 cursor-pointer"
-              asChild
-            >
-              <button
-                onClick={() => signOut()}
-                className="flex items-center gap-1 cursor-pointer w-full"
+                <Link
+                  to="/admin/settings"
+                  className="flex items-center gap-1 cursor-pointer"
+                >
+                  <Settings /> Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="flex items-center gap-1 cursor-pointer"
+                asChild
               >
-                <LogOut />
-                Logout
-              </button>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                <button
+                  onClick={() => signOut()}
+                  className="flex items-center gap-1 cursor-pointer w-full"
+                >
+                  <LogOut />
+                  Logout
+                </button>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </nav>
     </header>
   )

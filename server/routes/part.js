@@ -7,6 +7,7 @@ import {
   stockIn,
   stockOut,
   updatePart,
+  deletePart,
 } from "../controllers/PartController.js"
 import { validate } from "../middlewares/ValidationMiddleware.js"
 import {
@@ -25,5 +26,6 @@ router.patch("/:id", validate(updatePartSchema), updatePart)
 router.patch("/:id/stock-in", validate(stockOutandInSchema), stockIn)
 router.patch("/:id/stock-out", validate(stockOutandInSchema), stockOut)
 router.get("/all", getAllParts)
+router.delete("/:id", deletePart)
 
 export default router

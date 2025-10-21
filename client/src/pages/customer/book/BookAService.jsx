@@ -18,14 +18,16 @@ import { formatCurrency } from "@/lib/formatter";
 export async function loader() {
     const cars = await axiosClient.get("/cars/my-cars");
     const services = await axiosClient.get("/services");
-    return { cars: cars.data, services: services.data };
+    const technicians = await axiosClient.get("/users/technicians");
+    return { cars: cars.data, services: services.data, technicians: technicians.data };
 }
 
 export default function BookAService() {
-    const { cars, services } = useLoaderData();
+    const { cars, services, technicians } = useLoaderData();
     const [date, setDate] = useState();
     const [selectedCar, setSelectedCar] = useState(null);
     const [selectedServices, setSelectedServices] = useState([]);
+    const [selectedTechnician, setSelectedTechnician] = useState(null)
     const [time, setTime] = useState("");
     const navigate = useNavigate();
 
@@ -105,10 +107,12 @@ export default function BookAService() {
         }
 
         try {
+            const canChooseTech = selectedServices.some(s => s.allowCustomerTechChoice)
             const bookingData = {
                 carId: parseInt(selectedCar),
                 serviceIds: selectedServices.map(s => s.id),
                 scheduledAt: scheduledDateTime.toISOString(),
+                ...(canChooseTech && selectedTechnician && { technicianId: parseInt(selectedTechnician) }),
                 servicePreferences: { bookingMode: bookingMode }
             };
             await axiosClient.post("/bookings", bookingData);
@@ -211,6 +215,24 @@ export default function BookAService() {
                                     </Card>
                                 ))}
                             </div>
+                            {selectedServices.length > 0 && selectedServices.some(s => s.allowCustomerTechChoice) && (
+                                <div className="mt-4">
+                                    <label className="block mb-2 text-sm font-medium text-gray-900">Preferred Technician (optional)</label>
+                                    <Select onValueChange={(val) => setSelectedTechnician(val)}>
+                                        <SelectTrigger className="bg-gray-50 border text-gray-900 rounded-lg w-full">
+                                            <SelectValue placeholder="Select Technician..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectGroup>
+                                                <SelectLabel>Technicians</SelectLabel>
+                                                {technicians.technicians.map((tech) => (
+                                                    <SelectItem key={tech.id} value={tech.id.toString()}>{tech.name}</SelectItem>
+                                                ))}
+                                            </SelectGroup>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="mt-5 p-4 bg-yellow-50 rounded">

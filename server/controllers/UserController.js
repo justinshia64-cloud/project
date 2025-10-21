@@ -123,11 +123,21 @@ export async function getUsers(req, res) {
       prisma.user.count({ where }),
     ])
 
-    // Add status field based on booking count for backward compatibility
-    const usersWithStatus = users.map((user) => ({
-      ...user,
-      status: user.role || (user._count.bookings > 0 ? "Customer" : "User"),
-    }))
+    // Add status field for UI: map internal role and booking activity to friendly status
+    const usersWithStatus = users.map((user) => {
+      let status = "User"
+      // explicit role mapping first
+      if (user.role === "ADMIN") status = "Admin"
+      else if (user.role === "TECHNICIAN") status = "Technician"
+      else if (user.role === "CUSTOMER") status = "Customer"
+
+      // if role is a generic "USER" or unset, promote to Customer when they have bookings
+      if ((user.role === "USER" || !user.role) && (user._count?.bookings || 0) > 0) {
+        status = "Customer"
+      }
+
+      return { ...user, status }
+    })
 
     res.status(200).json({
       data: usersWithStatus,

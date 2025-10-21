@@ -28,7 +28,8 @@ export default function CustomerPortal() {
   return (
     <CustomerContext.Provider value={userData}>
       <SidebarProvider>
-        <div className="min-h-screen w-full flex flex-col relative">
+        {/* customer-ui wrapper sets border/line color to black for customer pages */}
+  <div className="min-h-screen w-full flex flex-col relative customer-root" style={{ '--border': '#000000', '--color-border': '#000000', '--sidebar-border': '#000000' }}>
           <CustomerNavbar />
           <div className="flex-1 flex">
             <div className="border-r">

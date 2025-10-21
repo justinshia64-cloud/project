@@ -18,8 +18,14 @@ export default function InvoiceModal({ booking, onClose }) {
     // You can use libraries like jsPDF or Puppeteer for PDF generation
   }
 
-  // No VAT: totals equal the quoted amount
-  const subtotal = quote.total
+  // Parts and service totals (no VAT)
+  const partsTotal =
+    booking.jobs?.[0]?.partsUsed?.reduce(
+      (sum, p) => sum + (p.quantity || 0) * (p.part?.price || 0),
+      0
+    ) || 0
+  const serviceTotal = quote?.total || 0
+  const subtotal = serviceTotal + partsTotal
   const total = subtotal
 
   return (
@@ -154,50 +160,34 @@ export default function InvoiceModal({ booking, onClose }) {
                   </tr>
                 </thead>
                 <tbody>
+
                   <tr>
                     <td className="border border-gray-300 px-4 py-3">
                       <div>
                         <p className="font-medium">{service.name}</p>
-                        <p className="text-sm text-gray-600">
-                          {service.description}
-                        </p>
+                        <p className="text-sm text-gray-600">{service.description}</p>
                       </div>
                     </td>
-                    <td className="border border-gray-300 px-4 py-3 text-center">
-                      1
-                    </td>
-                    <td className="border border-gray-300 px-4 py-3 text-right">
-                      {formatCurrency(service.cost)}
-                    </td>
-                    <td className="border border-gray-300 px-4 py-3 text-right">
-                      {formatCurrency(service.cost)}
-                    </td>
+                    <td className="border border-gray-300 px-4 py-3 text-center">1</td>
+                    <td className="border border-gray-300 px-4 py-3 text-right">{formatCurrency(service.cost)}</td>
+                    <td className="border border-gray-300 px-4 py-3 text-right">{formatCurrency(service.cost)}</td>
                   </tr>
 
-                  {/* Parts Used (if any) */}
+                  {/* Parts Used (if any) - render as separate rows with qty/unit/amount */}
                   {booking.jobs?.[0]?.partsUsed?.length > 0 && (
-                    <>
-                      {booking.jobs[0].partsUsed.map((partUsed, index) => (
-                        <tr key={index}>
-                          <td
-                            className="border border-gray-300 px-4 py-3"
-                            colSpan={4}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="font-medium">
-                                  {partUsed.part.name}
-                                </p>
-                                <p className="text-sm text-gray-600">
-                                  Replacement Part
-                                </p>
-                              </div>
-                              <p className=""> {partUsed.quantity} pieces</p>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </>
+                    booking.jobs[0].partsUsed.map((partUsed, index) => (
+                      <tr key={index}>
+                        <td className="border border-gray-300 px-4 py-3">
+                          <div>
+                            <p className="font-medium">{partUsed.part.name}</p>
+                            <p className="text-sm text-gray-600">Replacement Part</p>
+                          </div>
+                        </td>
+                        <td className="border border-gray-300 px-4 py-3 text-center">{partUsed.quantity}</td>
+                        <td className="border border-gray-300 px-4 py-3 text-right">{formatCurrency(partUsed.part?.price || 0)}</td>
+                        <td className="border border-gray-300 px-4 py-3 text-right">{formatCurrency((partUsed.quantity || 0) * (partUsed.part?.price || 0))}</td>
+                      </tr>
+                    ))
                   )}
 
                   {/* Labor/Additional Services */}

@@ -127,7 +127,7 @@ export default function Car() {
               <input
                 type="text"
                 placeholder="Enter search..."
-                className="border-1 border-black rounded-md bg-white py-1 px-2 "
+                className="border rounded-md bg-white py-1 px-2 "
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -135,7 +135,7 @@ export default function Car() {
             <div className="flex flex-col">
               <label htmlFor="filter">Filter:</label>
               <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="py-1 px-2 border-1 border-black rounded-md">
+                <SelectTrigger className="py-1 px-2 border rounded-md">
                   <SelectValue placeholder="Select a filter..." />
                 </SelectTrigger>
                 <SelectContent>

@@ -113,6 +113,28 @@ export default function Booking() {
     setCurrentPage(1)
   }, [search, filter, statusFilter])
 
+  // Listen for booking updates from other components (e.g., change request approvals)
+  useEffect(() => {
+    const handler = (e) => {
+      const updated = e.detail
+      if (!updated || !updated.id) return
+      setData((prev) => {
+        if (!prev || !prev.data) return prev
+        const existingIndex = prev.data.findIndex((b) => b.id === updated.id)
+        // if not found, prepend to list
+        if (existingIndex === -1) {
+          return { ...prev, data: [updated, ...prev.data] }
+        }
+        const newData = [...prev.data]
+        newData[existingIndex] = updated
+        return { ...prev, data: newData }
+      })
+    }
+
+    window.addEventListener('booking-updated', handler)
+    return () => window.removeEventListener('booking-updated', handler)
+  }, [])
+
   const bookFilters = [
     { value: "latest", label: "Latest" },
     { value: "oldest", label: "Oldest" },
@@ -311,19 +333,60 @@ export default function Booking() {
                       </TableCell>
 
                       <TableCell className="max-[600px]:hidden">
-                        {booking.technician ? (
-                          <div className="flex items-center gap-2">
-                            <UserCheck className="w-4 h-4 text-green-500" />
-                            <span className="font-medium">
-                              {booking.technician.name}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 text-gray-500">
-                            <Clock className="w-4 h-4" />
-                            <span>Not assigned</span>
-                          </div>
-                        )}
+                        {
+                          (() => {
+                            // Gather unique assigned technicians: primary + bookingTechnicians
+                            const techsMap = new Map()
+                            if (booking.technician) techsMap.set(booking.technician.id, booking.technician)
+                            if (booking.bookingTechnicians && booking.bookingTechnicians.length) {
+                              booking.bookingTechnicians.forEach(bt => {
+                                if (bt && bt.technician) techsMap.set(bt.technician.id, bt.technician)
+                              })
+                            }
+                            const techs = Array.from(techsMap.values())
+                            if (techs.length === 0) {
+                              return (
+                                <div className="flex items-center gap-2 text-gray-500">
+                                  <Clock className="w-4 h-4" />
+                                  <span>Not assigned</span>
+                                </div>
+                              )
+                            }
+
+                            // Local state for expanded list per row: use closure var and hack with useState-like behavior is not possible here
+                            // Simpler: render a small toggle using a controlled checkbox id per booking
+                            const id = `tech-toggle-${booking.id}`
+
+                            return (
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                  {techs.slice(0, 2).map((t) => (
+                                    <div key={t.id} className="flex items-center gap-1 px-2 py-1 border rounded-md bg-white">
+                                      <div className={`w-2 h-2 rounded-full ${t.available ? 'bg-green-500' : 'bg-gray-400'}`} />
+                                      <span className="text-sm font-medium">{t.name}</span>
+                                    </div>
+                                  ))}
+                                  {techs.length > 2 && (
+                                    <div className="relative">
+                                      <label htmlFor={id} className="cursor-pointer text-sm text-gray-600 px-2 py-1 border rounded-md">+{techs.length - 2}</label>
+                                      <input id={id} type="checkbox" className="sr-only peer" />
+                                      <div className="absolute right-0 top-8 hidden peer-checked:block bg-white border rounded-md shadow-lg w-60 z-50">
+                                        <div className="p-2">
+                                          {techs.map((t) => (
+                                            <div key={t.id} className="flex items-center gap-2 p-1">
+                                              <div className={`w-2 h-2 rounded-full ${t.available ? 'bg-green-500' : 'bg-gray-400'}`} />
+                                              <div className="text-sm">{t.name}</div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })()
+                        }
                       </TableCell>
 
                       <TableCell>{getStatusBadge(booking.status)}</TableCell>

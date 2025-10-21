@@ -61,16 +61,19 @@ export async function getRevenueSummary(req, res) {
     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    // Use billing totals (invoiced amounts) as the source of service revenue.
-    const [todayBillingsAgg, monthBillingsAgg, unpaidAgg, paidAgg] = await Promise.all([
-      prisma.billing.aggregate({ _sum: { total: true }, where: { createdAt: { gte: startOfDay, lte: endOfDay } } }),
-      prisma.billing.aggregate({ _sum: { total: true }, where: { createdAt: { gte: startOfMonth, lte: endOfDay } } }),
+    // Use actual payments (when customer clicked Add Payment) as the source of realized revenue.
+    // Keep invoiced/billing totals available for reporting (invoicedThisMonth, unpaid amounts),
+    // but revenue figures should only come from payments (paidAt timestamps).
+    const [todayPaymentsAgg, monthPaymentsAgg, unpaidAgg, totalPaymentsAgg, billingsThisMonthAgg] = await Promise.all([
+      prisma.payment.aggregate({ _sum: { amount: true }, where: { paidAt: { gte: startOfDay, lte: endOfDay } } }),
+      prisma.payment.aggregate({ _sum: { amount: true }, where: { paidAt: { gte: startOfMonth, lte: endOfDay } } }),
       prisma.billing.aggregate({ _sum: { total: true }, where: { status: "UNPAID" } }),
-      prisma.billing.aggregate({ _sum: { total: true }, where: { status: "PAID" } }),
+      prisma.payment.aggregate({ _sum: { amount: true } }),
+      prisma.billing.aggregate({ _sum: { total: true }, where: { createdAt: { gte: startOfMonth, lte: endOfDay } } }),
     ])
 
-    const billingsToday = todayBillingsAgg._sum.total || 0
-    const billingsThisMonth = monthBillingsAgg._sum.total || 0
+    const paymentsToday = todayPaymentsAgg._sum.amount || 0
+    const paymentsThisMonth = monthPaymentsAgg._sum.amount || 0
 
     // compute parts cost (sum of quantity * part.price) for jobs updated in the same ranges
     const [partsToday, partsMonth] = await Promise.all([
@@ -90,19 +93,21 @@ export async function getRevenueSummary(req, res) {
     const partsCostToday = sumPartsCost(partsToday)
     const partsCostThisMonth = sumPartsCost(partsMonth)
 
-    // revenue = payments (service revenue) - parts cost
-  // revenue = invoiced (billing totals) - parts cost
-  const revenueToday = billingsToday - partsCostToday
-  const revenueThisMonth = billingsThisMonth - partsCostThisMonth
+    // revenue = realized payments - parts cost
+    const revenueToday = paymentsToday - partsCostToday
+    const revenueThisMonth = paymentsThisMonth - partsCostThisMonth
 
-    // include invoiced totals explicitly as well
-    const invoicedThisMonth = billingsThisMonth
+    // include invoiced totals explicitly as well (invoiced amounts for month)
+    const invoicedThisMonth = billingsThisMonthAgg._sum.total || 0
+
+    // total paid (sum of all payments)
+    const totalPaid = totalPaymentsAgg._sum.amount || 0
 
     res.json({
       today: revenueToday || 0,
       thisMonth: revenueThisMonth || 0,
       unpaid: unpaidAgg._sum.total || 0,
-      paid: paidAgg._sum.total || 0,
+      paid: totalPaid,
       invoicedThisMonth,
     })
   } catch (err) {
@@ -122,10 +127,10 @@ export async function getTrends(req, res) {
       months.push({ dateKey: key, monthStart: d })
     }
 
-    // Fetch billings created in the 6-month window and partsUsed for jobs updated in same window
+    // Fetch payments (realized revenue) within the 6-month window and partsUsed for jobs updated in same window
     const windowStart = months[0].monthStart
-    const [billings, partsUsed] = await Promise.all([
-      prisma.billing.findMany({ where: { createdAt: { gte: windowStart } }, select: { total: true, createdAt: true } }),
+    const [payments, partsUsed] = await Promise.all([
+      prisma.payment.findMany({ where: { paidAt: { gte: windowStart } }, select: { amount: true, paidAt: true } }),
       prisma.partsUsed.findMany({ where: { job: { updatedAt: { gte: windowStart } } }, include: { part: { select: { price: true } }, job: { select: { updatedAt: true } } } }),
     ])
 
@@ -134,9 +139,9 @@ export async function getTrends(req, res) {
       return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`
     }
 
-    const billingsByMonth = billings.reduce((acc, b) => {
-      const key = toMonthKey(b.createdAt)
-      acc[key] = (acc[key] || 0) + (b.total || 0)
+    const paymentsByMonth = payments.reduce((acc, p) => {
+      const key = toMonthKey(p.paidAt)
+      acc[key] = (acc[key] || 0) + (p.amount || 0)
       return acc
     }, {})
 
@@ -147,7 +152,7 @@ export async function getTrends(req, res) {
       return acc
     }, {})
 
-    const revenueArray = months.map((m) => ({ date: m.dateKey, amount: (billingsByMonth[m.dateKey] || 0) - (partsByMonth[m.dateKey] || 0) }))
+  const revenueArray = months.map((m) => ({ date: m.dateKey, amount: (paymentsByMonth[m.dateKey] || 0) - (partsByMonth[m.dateKey] || 0) }))
     // For bookings count per month
     const bookings = await prisma.booking.findMany({ where: { createdAt: { gte: windowStart } }, select: { createdAt: true } })
     const bookingsByMonth = bookings.reduce((acc, b) => {

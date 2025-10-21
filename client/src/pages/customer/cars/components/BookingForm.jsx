@@ -145,7 +145,7 @@ export default function BookingForm({ setBookModal, bookModal }) {
           Service
         </label>
         <Select onValueChange={(val) => setValue("serviceId", val)}>
-          <SelectTrigger className="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600  w-full">
+          <SelectTrigger className="bg-gray-50 border text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600  w-full">
             <SelectValue placeholder="Select Service..." />
           </SelectTrigger>
           <SelectContent className="max-h-100">
@@ -165,7 +165,7 @@ export default function BookingForm({ setBookModal, bookModal }) {
             Technician
           </label>
           <Select onValueChange={(val) => setValue("technicianId", val)}>
-            <SelectTrigger className="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600  w-full">
+            <SelectTrigger className="bg-gray-50 border text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600  w-full">
               <SelectValue placeholder="Select Technician..." />
             </SelectTrigger>
             <SelectContent>
@@ -231,7 +231,7 @@ export default function BookingForm({ setBookModal, bookModal }) {
             const res = validateSchedule(sched)
             setTimeError(res.ok ? "" : res.message)
           }}
-          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-gray-900 focus:ring-primary-600 focus:border-primary-600"
+          className="block w-full rounded-lg border bg-gray-50 p-2.5 text-gray-900 focus:ring-primary-600 focus:border-primary-600"
         />
         {timeError && <p className="text-sm mt-1 text-red-600">{timeError}</p>}
       </div>

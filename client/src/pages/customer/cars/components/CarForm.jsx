@@ -90,7 +90,7 @@ export default function CarForm({ setModal, fetchCars, modal }) {
         <input
           {...register("plateNo")}
           type="text"
-          className="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
+          className="bg-gray-50 border text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
           placeholder="Enter plate number..."
           required
         />
@@ -108,7 +108,7 @@ export default function CarForm({ setModal, fetchCars, modal }) {
         <input
           {...register("brand")}
           type="text"
-          className="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
+          className="bg-gray-50 border text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
           placeholder="Enter car brand..."
           required
         />
@@ -126,7 +126,7 @@ export default function CarForm({ setModal, fetchCars, modal }) {
         <input
           {...register("model")}
           type="text"
-          className="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
+          className="bg-gray-50 border text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
           placeholder="Enter car model..."
           required
         />
@@ -145,7 +145,7 @@ export default function CarForm({ setModal, fetchCars, modal }) {
         <input
           {...register("year")}
           type="number"
-          className="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
+          className="bg-gray-50 border text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
           placeholder="Enter year..."
           required
         />
@@ -163,7 +163,7 @@ export default function CarForm({ setModal, fetchCars, modal }) {
         </label>
         <textarea
           {...register("notes")}
-          className="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 resize-none"
+          className="bg-gray-50 border text-gray-900 rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 resize-none"
           placeholder="Enter notes..."
           required
         />

@@ -43,6 +43,8 @@ import PartPagination from "./components/PartPagination"
 import PartModal from "./components/PartModal"
 import StockInModal from "./components/StockInModal"
 import StockOutModal from "./components/StockOutModal"
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { useCallback } from 'react'
 
 export async function loader() {
   const res = await axiosClient.get("/parts")
@@ -62,6 +64,7 @@ export default function Part() {
   })
   const [stockInModal, setStockInModal] = useState({ id: null, open: false })
   const [stockOutModal, setStockOutModal] = useState({ id: null, open: false })
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, id: null, name: '' })
 
   //function to fetch filtered data
   const fetchParts = async (searchTerm = "", sortBy = "", page = 1) => {
@@ -149,11 +152,12 @@ export default function Part() {
             <Table className="mt-5">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Price</TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead>Unit Cost</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead className="max-[400px]:hidden">Status</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead>Value</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -166,12 +170,8 @@ export default function Part() {
                 ) : (
                   data?.data?.map((d) => (
                     <TableRow key={d.id}>
-                      <TableCell className="font-medium max-w-sm truncate">
-                        {d.name}
-                      </TableCell>
-                      <TableCell>
-                        {d.price ? `₱${d.price.toFixed(2)}` : "₱0.00"}
-                      </TableCell>
+                      <TableCell className="font-medium max-w-sm truncate">{d.name}</TableCell>
+                      <TableCell className="font-mono">{d.price ? `₱${d.price.toFixed(2)}` : "₱0.00"}</TableCell>
                       <TableCell>{d.stock}</TableCell>
                       <TableCell className="max-[400px]:hidden">
                         {d.stock === 0 ? (
@@ -191,6 +191,7 @@ export default function Part() {
                           </span>
                         )}
                       </TableCell>
+                      <TableCell className="font-mono">{d.price ? `₱${(d.price * d.stock).toFixed(2)}` : "₱0.00"}</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger>
@@ -236,6 +237,13 @@ export default function Part() {
                             >
                               Edit
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setConfirmDialog({ open: true, id: d.id, name: d.name })}
+                              className="cursor-pointer text-red-600 flex items-center gap-1"
+                            >
+                              <X />
+                              Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -279,6 +287,23 @@ export default function Part() {
           stockOutModal={stockOutModal}
         />
       )}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title="Delete Part"
+        message={`Delete part ${confirmDialog.name}? This action cannot be undone.`}
+        onCancel={() => setConfirmDialog({ open: false, id: null, name: '' })}
+        onConfirm={async () => {
+          try {
+            await axiosClient.delete(`/parts/${confirmDialog.id}`)
+            toast.success('Part deleted')
+            fetchParts(search, filter, currentPage)
+          } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to delete')
+          } finally {
+            setConfirmDialog({ open: false, id: null, name: '' })
+          }
+        }}
+      />
     </>
   )
 }

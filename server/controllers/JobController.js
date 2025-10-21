@@ -23,10 +23,14 @@ export async function getJobs(req, res) {
         },
       }
     } else if (req.user.role === "TECHNICIAN") {
-      // Technician sees jobs from bookings assigned to them
+      // Technician should see jobs where they are assigned either as primary technician
+      // (booking.technicianId) or via the bookingTechnicians join table (many-to-many)
       baseWhere = {
         booking: {
-          technicianId: req.user.userId,
+          OR: [
+            { technicianId: req.user.userId },
+            { bookingTechnicians: { some: { technicianId: req.user.userId } } },
+          ],
         },
       }
     }
@@ -102,6 +106,9 @@ export async function getJobs(req, res) {
                   email: true,
                 },
               },
+              bookingTechnicians: {
+                include: { technician: { select: { id: true, name: true, email: true } } },
+              },
             },
           },
           notes: {
@@ -144,6 +151,18 @@ export async function getJobs(req, res) {
   }
 }
 
+// Helper: check if a user is assigned to the job (primary technician or via bookingTechnicians)
+async function isUserAssignedToJob(userId, jobId) {
+  const job = await prisma.job.findUnique({
+    where: { id: parseInt(jobId) },
+    include: { booking: { include: { bookingTechnicians: { select: { technicianId: true } }, technician: true } } },
+  })
+  if (!job) return false
+  if (job.booking?.technicianId === userId) return true
+  const assigned = (job.booking?.bookingTechnicians || []).some((b) => b.technicianId === userId)
+  return assigned
+}
+
 export async function updateJobStage(req, res) {
   try {
     const { id } = req.params
@@ -155,10 +174,42 @@ export async function updateJobStage(req, res) {
         .json({ error: "Cannot update stage to COMPLETION" })
     }
 
+    // Authorization: only assigned technicians or admins can update stage
+    if (req.user.role !== 'ADMIN') {
+      const allowed = await isUserAssignedToJob(req.user.userId, id)
+      if (!allowed) return res.status(403).json({ error: 'Not authorized to update this job' })
+    }
+
     const job = await prisma.job.update({
       where: { id: parseInt(id) },
       data: { stage },
+      include: { booking: { include: { bookingTechnicians: { include: { technician: true } }, technician: true, customer: true } } }
     })
+
+    // Notify assigned technicians (except actor) about stage change
+    try {
+      const actorId = req.user.userId
+      const techIds = []
+      if (job.booking?.technician) techIds.push(job.booking.technician.id)
+      if (job.booking?.bookingTechnicians) {
+        for (const bt of job.booking.bookingTechnicians) {
+          if (bt.technician && !techIds.includes(bt.technician.id)) techIds.push(bt.technician.id)
+        }
+      }
+      const notifications = techIds
+        .filter((t) => t !== actorId)
+        .map((t) => ({
+          userId: t,
+          title: `Job #${job.id} updated`,
+          message: `Job #${job.id} status changed to ${stage}`,
+          meta: { jobId: job.id },
+          read: false,
+        }))
+      if (notifications.length > 0) await prisma.notification.createMany({ data: notifications })
+    } catch (e) {
+      console.error('Failed to notify technicians about stage change', e)
+    }
+
     res.status(200).json({ message: "Job stage updated successfully" })
   } catch (err) {
     console.error(err)
@@ -171,6 +222,18 @@ export async function addJobNote(req, res) {
     const { id } = req.params
     const { content } = req.body
 
+    // Authorization: only assigned technicians or admins or the booking customer can add notes
+    if (req.user.role !== 'ADMIN') {
+      const allowedTech = await isUserAssignedToJob(req.user.userId, id)
+      // allow customers who own the booking to add notes as well
+      let isCustomerOwner = false
+      if (!allowedTech) {
+        const job = await prisma.job.findUnique({ where: { id: parseInt(id) }, include: { booking: true } })
+        if (job && job.booking?.customerId === req.user.userId) isCustomerOwner = true
+      }
+      if (!allowedTech && !isCustomerOwner) return res.status(403).json({ error: 'Not authorized to add notes to this job' })
+    }
+
     const jobNote = await prisma.jobNote.create({
       data: {
         content,
@@ -178,6 +241,30 @@ export async function addJobNote(req, res) {
         jobId: parseInt(id),
       },
     })
+
+    // Notify other assigned technicians (except author)
+    try {
+      const jobWithBooking = await prisma.job.findUnique({ where: { id: parseInt(id) }, include: { booking: { include: { bookingTechnicians: { select: { technicianId: true } }, technician: true } } } })
+      const actorId = req.user.userId
+      const techIds = []
+      if (jobWithBooking.booking?.technician) techIds.push(jobWithBooking.booking.technician.id)
+      if (jobWithBooking.booking?.bookingTechnicians) {
+        for (const bt of jobWithBooking.booking.bookingTechnicians) {
+          if (!techIds.includes(bt.technicianId)) techIds.push(bt.technicianId)
+        }
+      }
+      const notifications = techIds.filter(t => t !== actorId).map(t => ({
+        userId: t,
+        title: `New note on job #${id}`,
+        message: `A new note was added to job #${id}`,
+        meta: { jobId: parseInt(id), noteId: jobNote.id },
+        read: false,
+      }))
+      if (notifications.length > 0) await prisma.notification.createMany({ data: notifications })
+    } catch (e) {
+      console.error('Failed to notify technicians about new job note', e)
+    }
+
     res.status(200).json({ message: "Note added successfully" })
   } catch (err) {
     console.error(err)
@@ -190,6 +277,11 @@ export async function completeJob(req, res) {
   const { parts = [] } = req.body
 
   try {
+    // Authorization: only assigned technicians or admins can complete the job
+    if (req.user.role !== 'ADMIN') {
+      const allowed = await isUserAssignedToJob(req.user.userId, id)
+      if (!allowed) return res.status(403).json({ error: 'Not authorized to complete this job' })
+    }
     await prisma.$transaction(async (tx) => {
       // 1. Validate parts stock and decrement
       for (const item of parts) {
@@ -265,6 +357,19 @@ export async function completeJob(req, res) {
           if (!active) {
             await tx.user.update({ where: { id: techId }, data: { available: true } })
           }
+        }
+        // Notify all assigned technicians about completion
+        try {
+          const notifications = techIds.map((t) => ({
+            userId: t,
+            title: `Job #${id} completed`,
+            message: `Job #${id} has been marked as completed.`,
+            meta: { jobId: parseInt(id) },
+            read: false,
+          }))
+          if (notifications.length > 0) await tx.notification.createMany({ data: notifications })
+        } catch (e) {
+          console.error('Failed to create completion notifications', e)
         }
     })
 

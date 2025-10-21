@@ -16,6 +16,8 @@ import RequestChangeModal from "@/pages/customer/components/RequestChangeModal"
 import EditBookingModal from "@/pages/customer/components/EditBookingModal"
 import axiosClient from "@/axiosClient"
 import { toast } from "react-toastify"
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { useCallback } from 'react'
 
 const stages = ["DIAGNOSTIC", "REPAIR", "TESTING", "COMPLETION"]
 
@@ -29,10 +31,29 @@ export default function Stepper({ booking }) {
   const onCloseInvoice = () => setInvoiceModal(false)
   const [requestModal, setRequestModal] = useState({ open: false })
   const [editModal, setEditModal] = useState({ open: false })
+  const [dialog, setDialog] = useState({ open: false, message: '', type: null })
+
+  const onConfirmDialog = useCallback(async () => {
+    if (!dialog.open) return
+    const isConsult = dialog.type === 'consult'
+    try {
+      await axiosClient.patch(`/bookings/${booking.id}/cancel`)
+      toast.success(isConsult ? 'Consultation cancelled' : 'Booking cancelled')
+      window.location.reload()
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message)
+    } finally {
+      setDialog({ open: false, message: '', type: null })
+    }
+  }, [dialog, booking])
+
+  const onCancelDialog = useCallback(() => setDialog({ open: false, message: '', type: null }), [])
 
   const currentStageIndex = stages.indexOf(
     booking.jobs?.[0]?.stage || "DIAGNOSTIC"
   )
+
+  const isCompleted = booking.jobs?.some((j) => j.stage === "COMPLETION")
 
   // Robust consult detection
   const isConsult = (() => {
@@ -218,33 +239,25 @@ export default function Stepper({ booking }) {
             </Button>
 
             {/* For consultations we allow editing/requesting/cancelling regardless of scheduledAt (consults may use immediate "now") */}
-            {(isConsult || (new Date(booking.scheduledAt) > new Date())) && booking.status !== 'CANCELLED' && booking.status !== 'REJECTED' && (
+            {(isConsult || (new Date(booking.scheduledAt) > new Date())) && booking.status !== 'CANCELLED' && booking.status !== 'REJECTED' && !isCompleted && (
               <Button size="sm" onClick={() => { setRequestModal({ open: false }); setEditModal({ open: true }); }}>
                 {isConsult ? 'Edit Consultation' : 'Edit Booking'}
               </Button>
             )}
 
-            {(booking.status === "PENDING" || booking.status === "CONFIRMED") && (isConsult || new Date(booking.scheduledAt) > new Date()) && (
+            {(booking.status === "PENDING" || booking.status === "CONFIRMED") && (isConsult || new Date(booking.scheduledAt) > new Date()) && !isCompleted && (
               <Button size="sm" className="" onClick={() => setRequestModal({ open: true })}>
                 {isConsult ? 'Request Change' : 'Request Change'}
               </Button>
             )}
 
-            {(isConsult || new Date(booking.scheduledAt) > new Date()) && booking.status !== 'CANCELLED' && booking.status !== 'REJECTED' && (
-              <Button size="sm" variant="destructive" onClick={async () => {
-                const confirmText = isConsult ? 'Cancel this consultation?' : 'Cancel this booking?'
-                if (!confirm(confirmText)) return
-                try {
-                  await axiosClient.patch(`/bookings/${booking.id}/cancel`)
-                  toast.success(isConsult ? 'Consultation cancelled' : 'Booking cancelled')
-                  // ideally refresh parent state; fallback to reload
-                  window.location.reload()
-                } catch (err) {
-                  toast.error(err.response?.data?.message || err.message)
-                }
-              }}>
-                {isConsult ? 'Cancel Consultation' : 'Cancel Booking'}
-              </Button>
+            {(isConsult || new Date(booking.scheduledAt) > new Date()) && booking.status !== 'CANCELLED' && booking.status !== 'REJECTED' && !isCompleted && (
+              <>
+                <Button size="sm" variant="destructive" onClick={() => setDialog({ open: true, message: isConsult ? 'Cancel this consultation?' : 'Cancel this booking?', type: isConsult ? 'consult' : 'booking' })}>
+                  {isConsult ? 'Cancel Consultation' : 'Cancel Booking'}
+                </Button>
+                <ConfirmDialog open={dialog.open} title="Confirm Cancellation" message={dialog.message} onConfirm={onConfirmDialog} onCancel={onCancelDialog} />
+              </>
             )}
           </div>
 
@@ -263,6 +276,13 @@ export default function Stepper({ booking }) {
               <p>
                 Technician: {booking.technician?.name || "Not assigned yet"}
               </p>
+              {/* Show rejection reason to customer when booking was rejected */}
+              {booking.status === 'REJECTED' && booking.rejectReason && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+                  <h4 className="font-semibold text-red-700">Rejection</h4>
+                  <p className="text-sm text-red-600">{booking.rejectReason}</p>
+                </div>
+              )}
               {booking.changeRequests && booking.changeRequests.length > 0 && (
                 <div className="mt-3">
                   <h4 className="font-semibold">Change Request History</h4>

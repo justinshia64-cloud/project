@@ -5,7 +5,7 @@ import axiosClient from "@/axiosClient"
 import { formatDateTime } from "@/lib/formatter"
 import { toast } from "react-toastify"
 
-export default function NotificationsDropdown({ iconClass = "text-white" }) {
+export default function NotificationsDropdown({ iconClass = "text-white", pollInterval = 0 }) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
@@ -24,6 +24,16 @@ export default function NotificationsDropdown({ iconClass = "text-white" }) {
   }
 
   useEffect(() => { fetchNotifications() }, [])
+
+  // optional polling for near-real-time updates (pollInterval in ms)
+  useEffect(() => {
+    if (!pollInterval || pollInterval <= 0) return
+    const id = setInterval(() => {
+      // only fetch when dropdown is closed to avoid interfering with user interactions
+      if (!open) fetchNotifications()
+    }, pollInterval)
+    return () => clearInterval(id)
+  }, [pollInterval, open])
 
   const unreadCount = items.filter(i => !i.read).length
 

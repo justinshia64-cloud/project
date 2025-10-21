@@ -18,14 +18,16 @@ import { Switch } from '@/components/ui/switch'
 export async function loader() {
     const cars = await axiosClient.get("/cars/my-cars");
     const packages = await axiosClient.get("/packs");
-    return { cars: cars.data, packages: packages.data };
+    const technicians = await axiosClient.get("/users/technicians");
+    return { cars: cars.data, packages: packages.data, technicians: technicians.data };
 }
 
 export default function BookAPackage() {
-    const { cars, packages } = useLoaderData();
+    const { cars, packages, technicians } = useLoaderData();
     const [date, setDate] = useState();
     const [selectedCar, setSelectedCar] = useState(null);
     const [selectedPackage, setSelectedPackage] = useState(null);
+    const [selectedTechnician, setSelectedTechnician] = useState(null)
     const [time, setTime] = useState("");
     const navigate = useNavigate();
 
@@ -51,8 +53,9 @@ export default function BookAPackage() {
         ? (() => {
               const pkgPrice = Number(selectedPackage.price ?? selectedPackage.cost ?? 0);
               if (!isNaN(pkgPrice) && pkgPrice > 0) return pkgPrice;
+              const servicesList = Array.isArray(selectedPackage.services) ? selectedPackage.services : [];
               return (
-                  selectedPackage.services?.reduce((acc, s) => {
+                  servicesList.reduce((acc, s) => {
                       const p = Number(s.price ?? s.cost ?? 0);
                       return acc + (isNaN(p) ? 0 : p);
                   }, 0) ?? 0
@@ -102,7 +105,8 @@ export default function BookAPackage() {
         try {
             const bookingData = {
                 carId: parseInt(selectedCar),
-                packIds: [selectedPackage.id],
+                ...(selectedPackage ? { packIds: [selectedPackage.id] } : {}),
+                ...(selectedPackage && selectedPackage.services && selectedPackage.services.some(s => s.allowCustomerTechChoice) && selectedTechnician && { technicianId: parseInt(selectedTechnician) }),
                 scheduledAt: scheduledDateTime.toISOString(),
                 servicePreferences: { bookingMode: bookingMode }
             };
@@ -220,6 +224,25 @@ export default function BookAPackage() {
                                     </Card>
                                 ))}
                             </div>
+                            {/* Technician selector if package contains services that allow choosing technician */}
+                            {selectedPackage && selectedPackage.services && selectedPackage.services.some(s => s.allowCustomerTechChoice) && (
+                                <div className="mt-4">
+                                    <label className="block mb-2 text-sm font-medium text-gray-900">Preferred Technician (optional)</label>
+                                    <Select onValueChange={(val) => setSelectedTechnician(val)}>
+                                        <SelectTrigger className="bg-gray-50 border text-gray-900 rounded-lg w-full">
+                                            <SelectValue placeholder="Select Technician..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectGroup>
+                                                <SelectLabel>Technicians</SelectLabel>
+                                                {technicians.technicians.map((tech) => (
+                                                    <SelectItem key={tech.id} value={tech.id.toString()}>{tech.name}</SelectItem>
+                                                ))}
+                                            </SelectGroup>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="mt-5 p-4 bg-yellow-50 rounded">
